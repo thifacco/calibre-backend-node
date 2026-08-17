@@ -16,7 +16,11 @@ Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/en
 
 ## Estado atual
 
-Infraestrutura pronta: Express 5 + Mongoose + JWT, validação de ambiente, tratamento de erros, build e testes verdes. **As rotas do contrato ainda não existem** — `src/api/routes/index.ts` tem os pontos de montagem marcados com TODO, e `controllers/`, `services/`, `repositories/` e `models/` estão vazios.
+As sete rotas do contrato estão implementadas nas quatro camadas, com 41 testes passando.
+
+O que **não** foi validado: nenhum caminho feliz rodou contra um MongoDB real — não há credencial de Atlas neste ambiente. Os testes cobrem services com repository mockado e o wiring de auth/validação das rotas, que roda antes do banco. A primeira execução com Atlas ainda pode revelar problema de índice, transação ou conexão.
+
+Transações exigem replica set. O Atlas é um, mas um `mongod` standalone local faz `reactionRepository` e `commentRepository` falharem.
 
 ## Convenções do código
 

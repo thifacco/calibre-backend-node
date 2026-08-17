@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 import { unauthorized } from "../shared/AppError.js";
@@ -28,6 +28,16 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
     throw unauthorized("Token inválido ou expirado");
   }
 };
+
+/**
+ * Lê o userId posto por requireAuth. Se estourar, a rota foi montada sem o
+ * middleware — é erro de wiring, não de request.
+ */
+export function getUserId(req: Request): string {
+  const userId = req.auth?.userId;
+  if (userId === undefined) throw unauthorized("Rota autenticada sem requireAuth");
+  return userId;
+}
 
 export function signToken(userId: string): string {
   // JWT_EXPIRES_IN chega como string do .env; o tipo do jsonwebtoken é um
