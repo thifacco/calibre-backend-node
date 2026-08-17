@@ -2,11 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Comandos
+
+```bash
+npm run dev                        # servidor local na porta 4000, com reload
+npm run typecheck                  # tsc --noEmit
+npm test                           # suíte completa
+npx vitest run src/app.test.ts     # um arquivo isolado
+npx vitest run -t "nome do teste"  # um teste isolado
+```
+
+Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/env.ts` derruba o processo no boot se faltar variável. Os testes não precisam de `.env`: o ambiente vem do `vitest.config.ts`.
+
 ## Estado atual
 
-Repositório greenfield: só há documentação. Não existe `package.json`, tooling ou código-fonte — não presuma que há algo para rodar.
+Infraestrutura pronta: Express 5 + Mongoose + JWT, validação de ambiente, tratamento de erros, build e testes verdes. **As rotas do contrato ainda não existem** — `src/api/routes/index.ts` tem os pontos de montagem marcados com TODO, e `controllers/`, `services/`, `repositories/` e `models/` estão vazios.
 
-Alvo: TypeScript + Node.js + Express + MongoDB Atlas, servidor local na porta 4000, sem deploy nesta fase. Quando o scaffold existir, documentar aqui os comandos reais de dev, build e teste (incluindo como rodar um teste isolado).
+## Convenções do código
+
+- **ESM com extensão `.js` nos imports.** `"type": "module"` + `moduleResolution: NodeNext` — importe `./foo.js` mesmo o arquivo sendo `foo.ts`. Sem a extensão, quebra em runtime.
+- **`exactOptionalPropertyTypes` e `noUncheckedIndexedAccess` estão ligados.** Campos opcionais do contrato não aceitam `undefined` explícito, e indexar array devolve `T | undefined`.
+- **Erros de negócio via `AppError`.** Os services lançam `badRequest`/`conflict`/`notFound` de `src/shared/AppError.ts`; o `errorHandler` traduz para HTTP. O Express 5 encaminha rejeições async sozinho — não escreva wrapper `asyncHandler`.
+- **Shape de erro:** `{ error: { message, details? } }`. Foi escolhido no scaffold, não vem do brief — se o front-end esperar outro formato, é aqui que muda.
+- **Tipos do contrato ficam em `src/shared/contracts.ts`.** Mudou lá, é breaking change.
+- **Auth:** `requireAuth` de `src/middleware/auth.ts` popula `req.auth.userId`; `signToken` emite o JWT do login.
+- **`createApp()` não conecta no banco.** É o que permite testar HTTP sem Atlas — manter assim; a conexão vive em `src/server.ts`.
 
 ## Documentos de referência
 

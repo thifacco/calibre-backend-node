@@ -17,11 +17,38 @@ O front-end vive em repositório e deploy separados e consome o contrato de API 
 
 O MongoDB Atlas é remoto, então o back-end roda local sem precisar de banco instalado na máquina.
 
+## Como rodar
+
+Requer Node 22 ou superior.
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Preencha o `.env` com a connection string do Atlas e um `JWT_SECRET` aleatório. O servidor valida o ambiente no boot e recusa subir com variável faltando, listando o que falta.
+
+```bash
+npm run dev
+```
+
+Sobe em `http://localhost:4000` com reload automático. `GET /health` confirma que está no ar.
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | servidor local com reload |
+| `npm run build` | compila para `dist/` |
+| `npm start` | roda o build |
+| `npm run typecheck` | checagem de tipos sem emitir |
+| `npm test` | suíte completa |
+| `npm run test:watch` | testes em watch |
+| `npx vitest run src/app.test.ts` | um arquivo de teste isolado |
+
+Os testes não tocam o Atlas — o ambiente de teste é injetado pelo `vitest.config.ts` e o acesso a banco entra mockado no nível de repository.
+
 ## Estado do repositório
 
-Ainda não há código nem tooling — o repositório contém apenas a documentação. O scaffold (`package.json`, `tsconfig.json`, estrutura `/api`, conexão com o Atlas) é o próximo passo.
-
-Comandos de desenvolvimento serão documentados aqui quando o `package.json` existir.
+Infraestrutura pronta e verificada: build, testes, validação de ambiente, conexão com o Atlas, autenticação JWT e tratamento de erros. As rotas do contrato ainda não foram implementadas — `src/api/routes/index.ts` tem os pontos de montagem marcados.
 
 ## Documentação
 
