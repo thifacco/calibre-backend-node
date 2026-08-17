@@ -47,6 +47,39 @@ Regras de comportamento:
 
 - `POST /api/items/:id/reactions` precisa impedir reação duplicada do mesmo tipo pelo mesmo usuário.
 
+### Respostas e status
+
+O brief define o corpo de `POST /api/session` e `GET /api/feed`. **O resto foi decidido na implementação** — se o front-end espera outra coisa, é aqui que muda.
+
+| Rota | Status | Corpo |
+|---|---|---|
+| `POST /api/users` | 201 | `{ id, name, email, createdAt }` — nunca inclui `passwordHash` |
+| `POST /api/session` | 200 | `{ token, userId, name }` *(do brief)* |
+| `GET /api/feed` | 200 | `{ items, nextCursor }` *(do brief)* |
+| `POST /api/items` | 201 | o `FeedItem` criado |
+| `GET /api/items?userId=` | 200 | `{ items: FeedItem[] }` |
+| `POST /api/items/:id/reactions` | 201 | `{ reactionCounts }` já atualizado |
+| `POST /api/items/:id/comments` | 201 | `{ id, itemId, userId, userName, content, createdAt }` |
+
+Erros seguem `{ error: { message, details? } }`. `details` só aparece em 400 de validação, com `[{ field, message }]`.
+
+| Status | Quando |
+|---|---|
+| 400 | corpo/query inválidos, cursor corrompido, id malformado |
+| 401 | token ausente, inválido ou expirado; credenciais erradas no login |
+| 404 | item inexistente |
+| 409 | e-mail já cadastrado; reação duplicada |
+
+### Paginação do feed
+
+Página de 20 itens, ordenada por `createdAt` desc com `_id` como desempate. O cursor é uma string opaca (base64url de `createdAt|_id`) — o front só devolve o que recebeu.
+
+`createdAt` sozinho não serve de cursor: dois itens criados no mesmo milissegundo fariam a paginação pular ou repetir registros. Por isso o índice é composto `{ createdAt: -1, _id: -1 }`.
+
+A consulta busca 21 registros para saber se existe próxima página sem uma segunda query. O `nextCursor` aponta para o vigésimo — o último **entregue**, não a sonda.
+
+O filtro `q` casa parcialmente, sem diferenciar maiúsculas, contra `brand` ou `model`. O termo é escapado antes de virar regex.
+
 ## Autenticação
 
 1. O usuário define a própria senha no cadastro (o campo de confirmação é validado no front-end).

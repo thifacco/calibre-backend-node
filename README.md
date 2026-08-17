@@ -48,7 +48,9 @@ Os testes não tocam o Atlas — o ambiente de teste é injetado pelo `vitest.co
 
 ## Estado do repositório
 
-Infraestrutura pronta e verificada: build, testes, validação de ambiente, conexão com o Atlas, autenticação JWT e tratamento de erros. As rotas do contrato ainda não foram implementadas — `src/api/routes/index.ts` tem os pontos de montagem marcados.
+As sete rotas do contrato estão implementadas — cadastro, login, feed paginado por cursor, criação e listagem de itens, reações e comentários.
+
+Os testes rodam sem banco: cobrem os services com o repository mockado e a camada de auth e validação das rotas. Os caminhos felizes ainda não foram exercitados contra um MongoDB real.
 
 ## Documentação
 

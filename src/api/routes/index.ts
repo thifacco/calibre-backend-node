@@ -1,12 +1,16 @@
 import { Router } from "express";
+import { usersRouter } from "./users.js";
+import { sessionRouter } from "./session.js";
+import { feedRouter } from "./feed.js";
+import { itemsRouter } from "./items.js";
 
 /**
- * Router raiz montado em /api. Cada recurso do contrato ganha um sub-router
- * aqui — users, session, feed, items. Ver a tabela em ARQUITETURA.md.
+ * Router raiz montado em /api. A tabela do contrato está em ARQUITETURA.md —
+ * mudar rota aqui é breaking change para o front-end.
  */
 export const apiRouter = Router();
 
-// TODO: apiRouter.use("/users", usersRouter);
-// TODO: apiRouter.use("/session", sessionRouter);
-// TODO: apiRouter.use("/feed", feedRouter);
-// TODO: apiRouter.use("/items", itemsRouter);
+apiRouter.use("/users", usersRouter);
+apiRouter.use("/session", sessionRouter);
+apiRouter.use("/feed", feedRouter);
+apiRouter.use("/items", itemsRouter);
