@@ -49,4 +49,5 @@ Regras que se violam por padrão quando ninguém avisa. Cada uma está explicada
 - **Contador e detalhe mudam na mesma operação.** Criar reação ou comentário incrementa `reactionCounts`/`commentCount` atomicamente — transação ou `findOneAndUpdate`.
 - **Denormalização é intencional.** `userName` duplicado em `collectionItems` e `comments`, `photos` embutido, contadores no item: existem para o feed não fazer join. Não "normalizar" isso.
 - **Mudar rota ou shape de resposta é breaking change.** O front-end vive em outro repositório e espera o contrato literal — sincronizar antes de alterar.
+- **Nunca commitar direto na `main`.** Criar branch antes (`git checkout -b <tipo>/<descricao>`), commitar nela e abrir PR. Um hook `PreToolUse` em `.claude/settings.json` bloqueia o commit se a branch for `main` ou `master` — a regra aqui existe para ramificar antes de esbarrar no bloqueio.
 - **Nada de dado físico nem de encontro.** Sem geolocalização, endereço ou dado físico de usuário em nenhuma entidade; sem entidade de "match" ou "encontro". O Calibre é um clube, não uma ferramenta de matching.
