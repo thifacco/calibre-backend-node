@@ -18,9 +18,11 @@ Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/en
 
 As sete rotas do contrato estão implementadas nas quatro camadas, com 41 testes passando.
 
-O que **não** foi validado: nenhum caminho feliz rodou contra um MongoDB real — não há credencial de Atlas neste ambiente. Os testes cobrem services com repository mockado e o wiring de auth/validação das rotas, que roda antes do banco. A primeira execução com Atlas ainda pode revelar problema de índice, transação ou conexão.
+Os sete endpoints já rodaram contra um MongoDB real (local, 8.3) em 18/08/2026: cadastro, login, criação de item, feed, reação, reação duplicada recusada com 409 e comentário. As collections e os índices foram criados pelo boot, e os contadores do item bateram com o detalhe gravado — as transações funcionaram.
 
-Transações exigem replica set. O Atlas é um, mas um `mongod` standalone local faz `reactionRepository` e `commentRepository` falharem.
+Ainda não rodou contra o Atlas. E o caminho feliz continua sem teste automatizado: a suíte usa repository mockado, a verificação contra banco foi manual.
+
+**Transações exigem replica set.** `reactionRepository` e `commentRepository` falham em `mongod` standalone. O ambiente local foi convertido para replica set de nó único (`rs0`) por causa disso — a connection string precisa do `?replicaSet=rs0`.
 
 ## Convenções do código
 
