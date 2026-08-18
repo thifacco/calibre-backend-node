@@ -18,9 +18,11 @@ Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/en
 
 As sete rotas do contrato estão implementadas nas quatro camadas, com 41 testes passando.
 
-O que **não** foi validado: nenhum caminho feliz rodou contra um MongoDB real — não há credencial de Atlas neste ambiente. Os testes cobrem services com repository mockado e o wiring de auth/validação das rotas, que roda antes do banco. A primeira execução com Atlas ainda pode revelar problema de índice, transação ou conexão.
+Os sete endpoints já rodaram contra um MongoDB real (local, 8.3) em 18/08/2026: cadastro, login, criação de item, feed, reação, reação duplicada recusada com 409 e comentário. As collections e os índices foram criados pelo boot, e os contadores do item bateram com o detalhe gravado — as transações funcionaram.
 
-Transações exigem replica set. O Atlas é um, mas um `mongod` standalone local faz `reactionRepository` e `commentRepository` falharem.
+Ainda não rodou contra o Atlas. E o caminho feliz continua sem teste automatizado: a suíte usa repository mockado, a verificação contra banco foi manual.
+
+**Transações exigem replica set.** `reactionRepository` e `commentRepository` falham em `mongod` standalone. O ambiente local foi convertido para replica set de nó único (`rs0`) por causa disso — a connection string precisa do `?replicaSet=rs0`.
 
 ## Convenções do código
 
@@ -47,4 +49,5 @@ Regras que se violam por padrão quando ninguém avisa. Cada uma está explicada
 - **Contador e detalhe mudam na mesma operação.** Criar reação ou comentário incrementa `reactionCounts`/`commentCount` atomicamente — transação ou `findOneAndUpdate`.
 - **Denormalização é intencional.** `userName` duplicado em `collectionItems` e `comments`, `photos` embutido, contadores no item: existem para o feed não fazer join. Não "normalizar" isso.
 - **Mudar rota ou shape de resposta é breaking change.** O front-end vive em outro repositório e espera o contrato literal — sincronizar antes de alterar.
+- **Nunca commitar direto na `main`.** Criar branch antes (`git checkout -b <tipo>/<descricao>`), commitar nela e abrir PR. Um hook `PreToolUse` em `.claude/settings.json` bloqueia o commit se a branch for `main` ou `master` — a regra aqui existe para ramificar antes de esbarrar no bloqueio.
 - **Nada de dado físico nem de encontro.** Sem geolocalização, endereço ou dado físico de usuário em nenhuma entidade; sem entidade de "match" ou "encontro". O Calibre é um clube, não uma ferramenta de matching.

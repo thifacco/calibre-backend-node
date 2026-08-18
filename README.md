@@ -26,7 +26,26 @@ npm install
 cp .env.example .env
 ```
 
-Preencha o `.env` com a connection string do Atlas e um `JWT_SECRET` aleatório. O servidor valida o ambiente no boot e recusa subir com variável faltando, listando o que falta.
+Preencha o `.env` com a connection string do MongoDB e um `JWT_SECRET` aleatório. O servidor valida o ambiente no boot e recusa subir com variável faltando, listando o que falta.
+
+### O MongoDB precisa ser replica set
+
+As rotas de reação e comentário gravam o detalhe e incrementam o contador na mesma transação, e transação exige replica set. O Atlas já é um. Um `mongod` local instalado por padrão é standalone e faz essas duas rotas falharem — as outras cinco funcionam.
+
+Para converter uma instalação local em replica set de nó único, acrescente ao `mongod.cfg`:
+
+```yaml
+replication:
+  replSetName: rs0
+```
+
+Reinicie o serviço e inicialize o conjunto uma única vez. O host precisa ser explícito: com `bindIp: 127.0.0.1`, o padrão do `rs.initiate()` usa o hostname da máquina e o nó não se alcança.
+
+```javascript
+rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "127.0.0.1:27017" }] })
+```
+
+Enquanto o conjunto não for inicializado, o mongod sobe e escuta na porta mas não elege primário — e nenhum cliente consegue conectar, nem o Compass.
 
 ```bash
 npm run dev
@@ -50,7 +69,7 @@ Os testes não tocam o Atlas — o ambiente de teste é injetado pelo `vitest.co
 
 As sete rotas do contrato estão implementadas — cadastro, login, feed paginado por cursor, criação e listagem de itens, reações e comentários.
 
-Os testes rodam sem banco: cobrem os services com o repository mockado e a camada de auth e validação das rotas. Os caminhos felizes ainda não foram exercitados contra um MongoDB real.
+Os testes rodam sem banco: cobrem os services com o repository mockado e a camada de auth e validação das rotas. Os caminhos felizes foram verificados manualmente contra um MongoDB local — não existe teste automatizado de integração com banco.
 
 ## Documentação
 

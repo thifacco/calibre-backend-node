@@ -1,0 +1,390 @@
+{
+  "info": {
+    "_postman_id": "b7e4c1a2-9d3f-4e58-8a61-2c5f0d9e7b34",
+    "name": "Calibre API",
+    "description": "Contrato do back-end do Calibre.\n\nAs requisições estão na ordem de execução: rodar a coleção inteira pelo Collection Runner cria um usuário, loga, cria um item e interage com ele. Os scripts de teste preenchem `token`, `userId` e `itemId` sozinhos — não é preciso copiar nada à mão.\n\nO servidor precisa estar no ar (`npm run dev`) e o MongoDB precisa ser replica set: reação e comentário usam transação.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000", "type": "string" },
+    { "key": "email", "value": "", "type": "string" },
+    { "key": "password", "value": "senha-secreta", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "itemId", "value": "", "type": "string" },
+    { "key": "cursor", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 e status ok', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('ok');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Fora do contrato — só confirma que o servidor está no ar."
+      }
+    },
+    {
+      "name": "1. Autenticação",
+      "item": [
+        {
+          "name": "Cadastro",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// E-mail novo a cada execução: users.email tem índice único,",
+                  "// então repetir o mesmo devolveria 409.",
+                  "pm.collectionVariables.set('email', 'colecionador+' + Date.now() + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.collectionVariables.set('userId', body.id);",
+                  "",
+                  "pm.test('nao devolve passwordHash', function () {",
+                  "  pm.expect(body).to.not.have.property('passwordHash');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tiago\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Público. A senha vem definida pelo usuário e só o hash é persistido. Mínimo de 8 caracteres.\n\nO script de pre-request gera um e-mail novo a cada execução, porque `users.email` tem índice único."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.collectionVariables.set('token', body.token);",
+                  "pm.collectionVariables.set('userId', body.userId);",
+                  "",
+                  "pm.test('contrato { token, userId, name }', function () {",
+                  "  pm.expect(body).to.have.all.keys('token', 'userId', 'name');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "session"]
+            },
+            "description": "Público. Guarda o token nas variáveis da coleção — as requisições autenticadas herdam ele automaticamente.\n\nCredencial errada devolve 401 com a mesma mensagem de e-mail inexistente, de propósito: mensagens diferentes revelariam quais e-mails estão cadastrados."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Itens",
+      "item": [
+        {
+          "name": "Criar item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.collectionVariables.set('itemId', body.id);",
+                  "",
+                  "pm.test('userName vem desnormalizado', function () {",
+                  "  pm.expect(body.userName).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('contadores comecam zerados', function () {",
+                  "  pm.expect(body.reactionCounts).to.eql({ touched: 0, curious: 0, sameStory: 0 });",
+                  "  pm.expect(body.commentCount).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brand\": \"Seiko\",\n  \"model\": \"SKX007\",\n  \"referenceNumber\": \"SKX007J1\",\n  \"movementType\": \"AUTOMATIC\",\n  \"acquiredYear\": 2018,\n  \"acquiredContext\": \"Primeiro salario depois da formatura.\",\n  \"memoryStory\": \"Comprei com o primeiro salario. Uso ate hoje nos dias em que preciso de coragem.\",\n  \"photos\": [\n    \"https://exemplo.com/skx007-frente.jpg\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "items"]
+            },
+            "description": "Requer Bearer token. Cria o item do usuário autenticado copiando o `userName` do usuário — é essa cópia que permite o feed renderizar sem join.\n\nCampos opcionais: `referenceNumber`, `movementType`, `acquiredYear`, `acquiredContext`, `photos`.\n\n`movementType` aceita MANUAL, AUTOMATIC, QUARTZ, ECO_DRIVE, SPRING_DRIVE ou OTHER."
+          }
+        },
+        {
+          "name": "Itens de um usuário (dashboard)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('devolve { items: [...] }', function () {",
+                  "  pm.expect(pm.response.json().items).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/items?userId={{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "items"],
+              "query": [{ "key": "userId", "value": "{{userId}}" }]
+            },
+            "description": "Requer Bearer token. `userId` é obrigatório — sem ele, 400.\n\nO envelope `{ items: [...] }` foi decisão de implementação, não vem do brief."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Interação social",
+      "item": [
+        {
+          "name": "Reagir a um item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('devolve os contadores ja atualizados', function () {",
+                  "  pm.expect(pm.response.json().reactionCounts.touched).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"TOUCHED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{itemId}}/reactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "items", "{{itemId}}", "reactions"]
+            },
+            "description": "Requer Bearer token. `type` aceita TOUCHED, CURIOUS ou SAME_STORY.\n\nGrava a reação e incrementa o contador do item na mesma transação — por isso o MongoDB precisa ser replica set."
+          }
+        },
+        {
+          "name": "Reagir de novo (409 esperado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict em reacao duplicada', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"TOUCHED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{itemId}}/reactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "items", "{{itemId}}", "reactions"]
+            },
+            "description": "Caso negativo, incluído porque documenta comportamento do contrato.\n\nA mesma reação, do mesmo usuário, no mesmo item é recusada com 409. Quem barra é o índice único { itemId, userId, type } no banco, não uma checagem prévia na aplicação — checar antes teria janela de corrida entre a leitura e a escrita."
+          }
+        },
+        {
+          "name": "Comentar em um item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('comentario traz userName desnormalizado', function () {",
+                  "  pm.expect(pm.response.json().userName).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Esse SKX e um classico. A historia por tras dele e o melhor.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/items/{{itemId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "items", "{{itemId}}", "comments"]
+            },
+            "description": "Requer Bearer token. Máximo de 2000 caracteres.\n\nGrava o comentário e incrementa `commentCount` na mesma transação."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Feed",
+      "item": [
+        {
+          "name": "Feed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "",
+                  "pm.test('contrato { items, nextCursor }', function () {",
+                  "  pm.expect(body.items).to.be.an('array');",
+                  "  pm.expect(body).to.have.property('nextCursor');",
+                  "});",
+                  "",
+                  "// Encadeia a paginacao: se veio cursor, a proxima execucao",
+                  "// desta requisicao ja pede a pagina seguinte.",
+                  "if (body.nextCursor) {",
+                  "  pm.collectionVariables.set('cursor', body.nextCursor);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/feed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "feed"],
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "{{cursor}}",
+                  "disabled": true,
+                  "description": "Cursor opaco devolvido em nextCursor. Habilite para pedir a próxima página."
+                },
+                {
+                  "key": "q",
+                  "value": "seiko",
+                  "disabled": true,
+                  "description": "Filtro parcial por marca ou modelo, sem diferenciar maiúsculas."
+                }
+              ]
+            },
+            "description": "Público — o feed é a vitrine do clube.\n\nPágina de 20 itens, mais recentes primeiro. O `cursor` é uma string opaca: devolva exatamente o que veio em `nextCursor`. Quando `nextCursor` vem `null`, acabou.\n\nOs dois parâmetros de query estão desabilitados por padrão; marque o checkbox no Postman para usar."
+          }
+        }
+      ]
+    }
+  ]
+}
