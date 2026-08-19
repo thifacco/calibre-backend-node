@@ -1,28 +1,42 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Este arquivo orienta o Claude Code (claude.ai/code) ao trabalhar com o código deste repositório.
 
 ## Comandos
 
 ```bash
 npm run dev                        # servidor local na porta 4000, com reload
+npm run build                      # compila para dist/
+npm start                          # roda o build
 npm run typecheck                  # tsc --noEmit
 npm test                           # suíte completa
+npm run test:watch                 # suíte em watch
 npx vitest run src/app.test.ts     # um arquivo isolado
 npx vitest run -t "nome do teste"  # um teste isolado
 ```
 
-Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/env.ts` derruba o processo no boot se faltar variável. Os testes não precisam de `.env`: o ambiente vem do `vitest.config.ts`.
+Rodar o servidor exige `.env` preenchido (ver `.env.example`) — `src/config/env.ts` derruba o processo no boot se faltar variável, listando o que falta. Os testes não precisam de `.env`: o ambiente vem do `vitest.config.ts`.
 
 ## Estado atual
 
-As sete rotas do contrato estão implementadas nas quatro camadas, com 41 testes passando.
+As sete rotas do contrato estão implementadas nas quatro camadas, com 41 testes passando em 8 arquivos.
 
 Os sete endpoints já rodaram contra um MongoDB real (local, 8.3) em 18/08/2026: cadastro, login, criação de item, feed, reação, reação duplicada recusada com 409 e comentário. As collections e os índices foram criados pelo boot, e os contadores do item bateram com o detalhe gravado — as transações funcionaram.
 
 Ainda não rodou contra o Atlas. E o caminho feliz continua sem teste automatizado: a suíte usa repository mockado, a verificação contra banco foi manual.
 
 **Transações exigem replica set.** `reactionRepository` e `commentRepository` falham em `mongod` standalone. O ambiente local foi convertido para replica set de nó único (`rs0`) por causa disso — a connection string precisa do `?replicaSet=rs0`.
+
+**Não existe CORS.** `createApp()` não monta nenhum middleware de CORS, então nenhum browser em outra origem consegue chamar esta API — nem no feed público. O front-end contorna proxiando `/api/*` pelo servidor do Next, o que deixa tudo same-origin no ambiente local e não exigiu mudança aqui. Um deploy real vai exigir `cors` neste repositório.
+
+## Como os testes são escritos
+
+Nenhum teste toca banco, e é isso que mantém a suíte rodando em segundos sem Atlas nem `mongod`. Dois padrões, conforme a camada:
+
+- **Service** (`src/api/services/*.test.ts`) — `vi.mock` do módulo de repository **antes** do import do service, e `vi.mocked()` para tipar o dublê. `restoreMocks: true` no `vitest.config.ts` limpa tudo entre testes; não escreva `afterEach` de limpeza.
+- **Rota** (`src/api/routes/routes.test.ts`, `src/app.test.ts`) — `createApp().listen(0)` numa porta efêmera e `fetch` contra ela. Sem supertest, não é dependência do projeto.
+
+Os testes de rota cobrem só o que roda **antes** do banco: auth e validação. Caminho feliz de rota chega ao repository e ficaria dependente de Mongo — é a lacuna conhecida da suíte, não um esquecimento.
 
 ## Convenções do código
 
@@ -31,6 +45,7 @@ Ainda não rodou contra o Atlas. E o caminho feliz continua sem teste automatiza
 - **Erros de negócio via `AppError`.** Os services lançam `badRequest`/`conflict`/`notFound` de `src/shared/AppError.ts`; o `errorHandler` traduz para HTTP. O Express 5 encaminha rejeições async sozinho — não escreva wrapper `asyncHandler`.
 - **Shape de erro:** `{ error: { message, details? } }`. Foi escolhido no scaffold, não vem do brief — se o front-end esperar outro formato, é aqui que muda.
 - **Tipos do contrato ficam em `src/shared/contracts.ts`.** Mudou lá, é breaking change.
+- **Documento do Mongo não sai do service.** `src/api/services/mappers.ts` traduz doc → contrato (`_id` vira `id`, `Date` vira ISO, opcional ausente é **omitido**, não `undefined` — `exactOptionalPropertyTypes`). Service devolve tipo de `contracts.ts`; nunca `CollectionItemDoc` cru.
 - **Auth:** `requireAuth` de `src/middleware/auth.ts` popula `req.auth.userId`; `signToken` emite o JWT do login.
 - **`createApp()` não conecta no banco.** É o que permite testar HTTP sem Atlas — manter assim; a conexão vive em `src/server.ts`.
 
@@ -40,6 +55,8 @@ Ainda não rodou contra o Atlas. E o caminho feliz continua sem teste automatiza
 - [README.md](README.md) — produto, stack, débitos técnicos aceitos.
 
 O brief de produto (fora do repositório: `Documentos/Projetos Claude/Calibre/calibre-backend-brief.md`) é a fonte da verdade do escopo. Não é espaço para reabrir decisões de produto ou arquitetura.
+
+O front-end vive em `calibre-frontend-react` (repositório separado, Next.js) e consome este contrato literalmente. O `ARQUITETURA.md` de lá espelha a tabela de rotas daqui — daqui é que ela sai.
 
 ## Invariantes
 
